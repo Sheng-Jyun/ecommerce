@@ -16,7 +16,7 @@ function App() {
           <Route path='/purchase/paymentEntry' element={<PaymentEntry/>} />
           <Route path='/purchase/shippingEntry' element={<ShippingEntry/>} />
           <Route path='/purchase/viewOrder' element={<ViewOrder/>} />
-          <Route path='/purchase/viewConfirmation' element={<Confirmation/>} />
+          <Route path="/confirmation" element={<Confirmation />} />
         </Routes>
       </div>
     </Router>

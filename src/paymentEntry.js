@@ -4,53 +4,37 @@ import { useLocation, useNavigate } from 'react-router-dom';
 function PaymentEntry() {
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Get cart data
   const [cartData, setCartData] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
-  
+
   // Payment
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: '',
     expiryDate: '',
-    cvvCode: '', 
+    cvvCode: '',
     cardHolder: '',
     paymentMethod: 'credit'
   });
 
   // Get cart data
   useEffect(() => {
-    // Get data
     const savedCart = localStorage.getItem('shoppingCart');
     const savedTotal = localStorage.getItem('totalAmount');
-    
-    if (savedCart) {
-      setCartData(JSON.parse(savedCart));
-    }
-    
-    if (savedTotal) {
-      setTotalAmount(parseInt(savedTotal));
-    }
 
-    // Also check location state (if coming back from shipping entry)
+    if (savedCart) setCartData(JSON.parse(savedCart));
+    if (savedTotal) setTotalAmount(parseInt(savedTotal));
+
     if (location.state) {
-      console.log('Location state data:', location.state);
-      if (location.state.cart) {
-        setCartData(location.state.cart);
-      }
-      if (location.state.total) {
-        setTotalAmount(location.state.total);
-      }
+      if (location.state.cart) setCartData(location.state.cart);
+      if (location.state.total) setTotalAmount(location.state.total);
     }
   }, [location]);
 
-  
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setPaymentForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setPaymentForm(prev => ({ ...prev, [name]: value }));
   };
 
   // Format credit card number
@@ -59,74 +43,57 @@ function PaymentEntry() {
     const matches = v.match(/\d{4,16}/g);
     const match = (matches && matches[0]) || '';
     const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
+    for (let i = 0, len = match.length; i < len; i += 4) parts.push(match.substring(i, i + 4));
+    return parts.length ? parts.join(' ') : v;
   };
 
-  // Handle credit card number input
   const handleCardNumberChange = (e) => {
     const formatted = formatCardNumber(e.target.value);
-    setPaymentForm(prev => ({
-      ...prev,
-      cardNumber: formatted
-    }));
+    setPaymentForm(prev => ({ ...prev, cardNumber: formatted }));
   };
 
-  // Handle expiry date input
   const handleExpiryDateChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ''); 
-    
-    if (value.length >= 2) {
-      value = value.substring(0, 2) + '/' + value.substring(2, 4);
-    }
-    
-    setPaymentForm(prev => ({
-      ...prev,
-      expiryDate: value
-    }));
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length >= 2) value = value.substring(0, 2) + '/' + value.substring(2, 4);
+    setPaymentForm(prev => ({ ...prev, expiryDate: value }));
   };
 
-  // Handle form submission
+  // Handle form submission -> 只驗證 & 存 payment，然後到 shipping 頁
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Basic form validation
-    if (!paymentForm.cardNumber || !paymentForm.expiryDate || 
+
+    if (!paymentForm.cardNumber || !paymentForm.expiryDate ||
         !paymentForm.cvvCode || !paymentForm.cardHolder) {
       alert('Please fill in all required fields: card number, expiry date, CVV code, and cardholder name!');
       return;
     }
 
-    // Validate credit card number format
     const cleanCardNumber = paymentForm.cardNumber.replace(/\s/g, '');
     if (cleanCardNumber.length !== 16 || !/^\d+$/.test(cleanCardNumber)) {
       alert('Please enter a valid 16-digit credit card number!');
       return;
     }
 
-    // Validate expiry date
     const expiryPattern = /^(0[1-9]|1[0-2])\/\d{2}$/;
     if (!expiryPattern.test(paymentForm.expiryDate)) {
       alert('Please enter the correct expiry date format (MM/YY)!');
       return;
     }
 
-    // Validate CVV code
     if (!/^\d{3,4}$/.test(paymentForm.cvvCode)) {
       alert('Please enter a valid 3-4 digit CVV code!');
       return;
     }
 
-    // Save payment information
+    if (cartData.length === 0) {
+      alert('Your cart is empty.');
+      return;
+    }
+
+    // 存付款資訊（給 shippingEntry 用）
     localStorage.setItem('paymentInfo', JSON.stringify(paymentForm));
-    
-    // Navigate to next page
+
+    // 前往 shipping 頁
     navigate('/purchase/shippingEntry', {
       state: {
         cart: cartData,
@@ -136,7 +103,6 @@ function PaymentEntry() {
     });
   };
 
-  // Return to shopping page
   const handleBack = () => {
     navigate('/purchase');
   };
@@ -144,11 +110,11 @@ function PaymentEntry() {
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Payment Information</h1>
-      
+
       {/* Order Summary */}
       {cartData.length > 0 && (
-        <div style={{ 
-          padding: '20px', 
+        <div style={{
+          padding: '20px',
           borderRadius: '8px',
           marginBottom: '30px',
           border: '1px solid #dee2e6',
@@ -156,34 +122,33 @@ function PaymentEntry() {
         }}>
           <h3>Order Summary</h3>
           {cartData.map(item => (
-            <div key={item.id} style={{ 
-              display: 'flex', 
+            <div key={item.id} style={{
+              display: 'flex',
               justifyContent: 'space-between',
               marginBottom: '10px',
               paddingBottom: '10px',
               borderBottom: '1px solid #dee2e6'
             }}>
               <div>
-                <strong>{item.name}</strong>
-                <br />
+                <strong>{item.name}</strong><br />
                 <small style={{ color: '#495057' }}>
-                  ${item.price.toLocaleString()} × {item.quantity}
+                  ${Number(item.price).toLocaleString()} × {item.quantity}
                 </small>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <strong>${(item.price * item.quantity).toLocaleString()}</strong>
+                <strong>${(Number(item.price) * Number(item.quantity)).toLocaleString()}</strong>
               </div>
             </div>
           ))}
           <hr />
-          <div style={{ 
-            display: 'flex', 
+          <div style={{
+            display: 'flex',
             justifyContent: 'space-between',
             fontSize: '18px',
             fontWeight: 'bold'
           }}>
             <span>Total:</span>
-            <span style={{ color: '#e74c3c' }}>${totalAmount.toLocaleString()}</span>
+            <span style={{ color: '#e74c3c' }}>${Number(totalAmount).toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -310,7 +275,7 @@ function PaymentEntry() {
         </div>
 
         <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <button 
+          <button
             type="button"
             onClick={handleBack}
             style={{
@@ -325,8 +290,8 @@ function PaymentEntry() {
           >
             Back to Shopping
           </button>
-          
-          <button 
+
+          <button
             type="submit"
             style={{
               backgroundColor: '#28a745',
