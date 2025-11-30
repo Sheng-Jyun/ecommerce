@@ -5,8 +5,8 @@ function ShippingEntry() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 你的 API base
-  const BASE = 'https://fkw5fubldj.execute-api.us-east-2.amazonaws.com/dev';
+  // Your API base
+  const BASE = 'https://ybfzpctey6.execute-api.us-east-2.amazonaws.com/dev';
 
   // Data from previous page
   const [cartData, setCartData] = useState([]);
@@ -58,21 +58,21 @@ function ShippingEntry() {
   // ZIP code format
   const validateZip = (zip) => /^\d{5}$/.test(zip);
 
-  // ---- 呼叫後端下單 ----
+  // ---- Call backend to place order ----
   async function placeOrder() {
-    // 組裝 items
+    // Items payload
     const itemsPayload = cartData.map(x => ({
-      id: String(x.id),
+      id: String(x.id),                          // ensure string id
       qty: Number(x.quantity || x.qty || 0)
     }));
 
-    // 組裝 payment（只傳 method/last4，避免把卡資料送到後端）
+    // Payment: only send method/last4
     const payment = {
       method: paymentInfo.paymentMethod || 'card',
       last4: (paymentInfo.cardNumber || '').replace(/\s/g, '').slice(-4)
     };
 
-    // 組裝 shipping
+    // Shipping
     const shipping = {
       name: shippingForm.name,
       address: [
@@ -82,37 +82,57 @@ function ShippingEntry() {
       ].filter(Boolean).join(', ')
     };
 
-    const res = await fetch(`${BASE}/order_process/order`, {
+    const res = await fetch(`${BASE}/order-processing/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: itemsPayload, payment, shipping })
     });
 
-    // 兼容非-proxy 回傳
     let data = {};
     try {
       const raw = await res.json();
-      data = raw?.confirmation || raw?.error || raw?.items
-        ? raw
-        : (typeof raw?.body === 'string' ? JSON.parse(raw.body) : raw);
-    } catch (_) { /* ignore */ }
+      console.log('Order raw response:', raw);
 
-    if (res.status === 201 || data?.confirmation) {
-      // 清空暫存
+      // Cases:
+      // 1) { confirmation: '...' }
+      // 2) { statusCode, headers, body: '{"confirmation":"..."}' }
+      if (raw && (raw.confirmation || raw.error || raw.items)) {
+        data = raw;
+      } else if (raw && typeof raw.body === 'string') {
+        try {
+          const inner = JSON.parse(raw.body);
+          data = inner;
+        } catch {
+          data = raw;
+        }
+      } else {
+        data = raw;
+      }
+    } catch (e) {
+      console.error('Order response JSON parse error:', e);
+      data = {};
+    }
+
+    // ✅ Success (accept 201 or 200 as long as we have confirmation)
+    if ((res.status === 201 || res.status === 200) && data?.confirmation) {
       localStorage.removeItem('shoppingCart');
       localStorage.removeItem('totalAmount');
       localStorage.removeItem('shippingInfo');
-      // 前往確認頁
       navigate('/confirmation', { state: { confirmation: data.confirmation } });
       return;
     }
 
+    // ✅ Insufficient inventory
     if (res.status === 409 || data?.error === 'insufficient_inventory') {
       setServerError({ type: 'stock', details: data.details || [] });
       return;
     }
 
-    setServerError({ type: 'generic', message: data?.error || `HTTP ${res.status}` });
+    // Other errors
+    setServerError({
+      type: 'generic',
+      message: data?.error || `HTTP ${res.status}`
+    });
   }
 
   // Handle form submission
@@ -136,13 +156,13 @@ function ShippingEntry() {
       return;
     }
 
-    // Save shipping info (可留作返回時回填)
     localStorage.setItem('shippingInfo', JSON.stringify(shippingForm));
 
     setSubmitting(true);
     try {
       await placeOrder();
     } catch (err) {
+      console.error('placeOrder failed:', err);
       setServerError({ type: 'generic', message: String(err) });
     } finally {
       setSubmitting(false);
@@ -160,7 +180,7 @@ function ShippingEntry() {
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Shipping Information</h1>
 
-      {/* 錯誤訊息區 */}
+      {/* Error area */}
       {serverError?.type === 'stock' && (
         <div style={{ background: '#fff3cd', padding: 12, borderRadius: 6, marginBottom: 12 }}>
           <strong>Some items are not available in requested quantity:</strong>
@@ -239,12 +259,12 @@ function ShippingEntry() {
               placeholder="Enter recipient's full name"
               required
               style={{
-                  width: '100%',
-                  padding: '10px',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  fontSize: '16px'
-                }}
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                fontSize: '16px'
+              }}
             />
           </div>
 
@@ -423,3 +443,5 @@ function ShippingEntry() {
 }
 
 export default ShippingEntry;
+
+

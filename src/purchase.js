@@ -1,59 +1,81 @@
+// src/components/Purchase.js
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Purchase() {
   const navigate = useNavigate();
 
-  // ====== 這裡換成你的 API Gateway base ======
   const BASE =
-    "https://fkw5fubldj.execute-api.us-east-2.amazonaws.com/dev/inventory_managemnet";
+    "https://ybfzpctey6.execute-api.us-east-2.amazonaws.com/dev/inventory-management";
 
-  // 從後端載入的商品
-  const [items, setItems] = useState([]);         // [{id, name, price, qty}]
+  const [items, setItems] = useState([]);   // [{id, name, price, qty}]
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [cart, setCart] = useState({});     // { [itemId]: qty }
 
-  // 購物車： { [itemId]: qty }
-  const [cart, setCart] = useState({});
+  useEffect(() => {
+    async function fetchInventory() {
+      try {
+        const res = await fetch(`${BASE}/inventory`);
 
-  // ====== 第一次渲染就抓商品清單 ======
-useEffect(() => {
-  async function fetchInventory() {
-    try {
-      const res = await fetch(`${BASE}/inventory`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      // 兩種情況都處理：
-      // 1) Lambda Proxy：data = { items: [...] }
-      // 2) 非 Proxy（或自訂 mapping）：data = { statusCode, headers, body: "{...}" }
-      let itemsPayload = data.items;
-      if (!itemsPayload && typeof data.body === "string") {
+        const text = await res.text();
+        let data;
         try {
-          const inner = JSON.parse(data.body);
-          itemsPayload = inner.items;
+          data = JSON.parse(text);
         } catch (e) {
-          console.error("Failed to parse inner body JSON:", e, data.body);
+          console.error("Inventory: JSON parse error:", e, text);
+          setError("Failed to load inventory.");
+          return;
         }
-      }
 
-      setItems(Array.isArray(itemsPayload) ? itemsPayload : []);
-      if (!itemsPayload) {
-        // 方便除錯
-        console.warn("Inventory payload not found. Raw data:", data);
+        // two possible shapes:
+        // 1) { items: [...] }
+        // 2) { statusCode, headers, body: "{\"items\":[...]}" }
+        let itemsPayload = Array.isArray(data.items) ? data.items : undefined;
+        let errorMessage = data.error;
+
+        if (!itemsPayload && data.body) {
+          try {
+            const inner =
+              typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+            if (Array.isArray(inner.items)) {
+              itemsPayload = inner.items;
+            }
+            if (inner.error) errorMessage = inner.error;
+          } catch (e) {
+            console.error("Inventory: inner body JSON parse error:", e, data.body);
+          }
+        }
+
+        if (errorMessage && !itemsPayload) {
+          console.error("Inventory API error:", errorMessage);
+          setError("Failed to load inventory.");
+          return;
+        }
+
+        if (!itemsPayload) {
+          console.error("Inventory: items not found in response:", data);
+          setError("Failed to load inventory.");
+          return;
+        }
+
+        const normalized = itemsPayload.map((it) => ({
+          ...it,
+          qty: it.qty ?? it.availableQty ?? 0,
+        }));
+
+        setItems(normalized);
+      } catch (err) {
+        console.error("Failed to load inventory:", err);
+        setError("Failed to load inventory.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Failed to load inventory:", err);
-      setError("Failed to load inventory.");
-    } finally {
-      setLoading(false);
     }
-  }
-  fetchInventory();
-}, []);
 
+    fetchInventory();
+  }, []);
 
-  // ====== 變更數量（會依庫存自動截斷）======
   const handleQuantityChange = (itemId, quantity) => {
     const qtyNum = Math.max(0, parseInt(quantity || 0, 10));
 
@@ -64,7 +86,6 @@ useEffect(() => {
       return;
     }
 
-    // 根據庫存限制數量
     const item = items.find((x) => String(x.id) === String(itemId));
     const maxQty = item ? Number(item.qty || 0) : 0;
     const finalQty = Math.min(qtyNum, maxQty);
@@ -72,21 +93,19 @@ useEffect(() => {
     setCart((prev) => ({ ...prev, [itemId]: finalQty }));
   };
 
-  // ====== 總金額 ======
   const calculateTotal = () => {
     return Object.entries(cart).reduce((total, [itemId, quantity]) => {
-      const item = items.find(item => String(item.id) === String(itemId));
+      const item = items.find((item) => String(item.id) === String(itemId));
       if (!item) return total;
 
       const unitPrice = Number(item.price);
-      const qty       = Number(quantity);
+      const qty = Number(quantity);
       const lineTotal = unitPrice * qty;
 
       return total + (Number.isFinite(lineTotal) ? lineTotal : 0);
     }, 0);
   };
 
-  // ====== 送出（維持你原本導向付款頁的流程）======
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -95,17 +114,23 @@ useEffect(() => {
       return;
     }
 
-    // 組裝購物車明細（帶入後端的 price/name/qty）
-    const cartData = Object.entries(cart).map(([itemId, quantity]) => {
-      const item = items.find((x) => String(x.id) === String(itemId));
-      return item
-        ? { id: item.id, name: item.name, price: item.price, category: item.category, quantity }
-        : null;
-    }).filter(Boolean);
+    const cartData = Object.entries(cart)
+      .map(([itemId, quantity]) => {
+        const item = items.find((x) => String(x.id) === String(itemId));
+        return item
+          ? {
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              category: item.category,
+              quantity,
+            }
+          : null;
+      })
+      .filter(Boolean);
 
     const total = calculateTotal();
 
-    // 你原本的流程：暫存到 localStorage + 導頁
     localStorage.setItem("shoppingCart", JSON.stringify(cartData));
     localStorage.setItem("totalAmount", total);
 
@@ -118,7 +143,6 @@ useEffect(() => {
     });
   };
 
-  // ====== UI ======
   if (loading) {
     return (
       <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
@@ -127,6 +151,7 @@ useEffect(() => {
       </div>
     );
   }
+
   if (error) {
     return (
       <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
@@ -166,7 +191,8 @@ useEffect(() => {
               >
                 <div>
                   <h3 style={{ margin: "0 0 5px 0" }}>
-                    {item.name} <small style={{ color: "#6c757d" }}>(ID: {item.id})</small>
+                    {item.name}{" "}
+                    <small style={{ color: "#6c757d" }}>(ID: {item.id})</small>
                   </h3>
                   {item.category && (
                     <p style={{ margin: 0, color: "#495057" }}>
@@ -187,15 +213,23 @@ useEffect(() => {
                   </p>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
                   <label htmlFor={`quantity-${itemId}`}>Quantity:</label>
                   <input
                     id={`quantity-${itemId}`}
                     type="number"
                     min="0"
-                    max={inStock}                               // 依庫存限制
+                    max={inStock}
                     value={selected}
-                    onChange={(e) => handleQuantityChange(itemId, e.target.value)}
+                    onChange={(e) =>
+                      handleQuantityChange(itemId, e.target.value)
+                    }
                     disabled={inStock === 0}
                     style={{
                       width: "70px",
@@ -211,7 +245,6 @@ useEffect(() => {
           })}
         </div>
 
-        {/* Shopping Cart Summary */}
         {Object.keys(cart).length > 0 && (
           <div
             style={{
@@ -224,30 +257,32 @@ useEffect(() => {
           >
             <h3>Shopping Cart Summary</h3>
             {Object.entries(cart).map(([itemId, quantity]) => {
-              // 如果你的 item.id 是 "A001" 這種字串，就不要 parseInt，直接比對：
-              const item = items.find(item => String(item.id) === String(itemId));
-
+              const item = items.find(
+                (item) => String(item.id) === String(itemId)
+              );
               if (!item) return null;
 
-              const unitPrice = Number(item.price);          // 單價
-              const qty       = Number(quantity);            // 數量
-              const lineTotal = unitPrice * qty;             // 小計
+              const unitPrice = Number(item.price);
+              const qty = Number(quantity);
+              const lineTotal = unitPrice * qty;
 
               return (
                 <div
                   key={itemId}
                   style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '5px'
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "5px",
                   }}
                 >
-                  <span>{item.name} x {qty}</span>
+                  <span>
+                    {item.name} x {qty}
+                  </span>
                   <span>
                     $
                     {Number.isFinite(lineTotal)
-                      ? lineTotal.toFixed(2)                 // 兩位小數
-                      : '0.00'}
+                      ? lineTotal.toFixed(2)
+                      : "0.00"}
                   </span>
                 </div>
               );
@@ -281,8 +316,12 @@ useEffect(() => {
               boxShadow: "0 2px 6px rgba(0, 123, 255, 0.3)",
               transition: "all 0.2s ease",
             }}
-            onMouseOver={(e) => (e.target.style.backgroundColor = "#0056b3")}
-            onMouseOut={(e) => (e.target.style.backgroundColor = "#007bff")}
+            onMouseOver={(e) =>
+              (e.target.style.backgroundColor = "#0056b3")
+            }
+            onMouseOut={(e) =>
+              (e.target.style.backgroundColor = "#007bff")
+            }
           >
             Proceed to Payment
           </button>
@@ -293,3 +332,5 @@ useEffect(() => {
 }
 
 export default Purchase;
+
+
