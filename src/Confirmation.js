@@ -9,8 +9,24 @@ function Confirmation() {
   const [orderData, setOrderData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  
-  const CONFIRMATION_NUMBER = "EC234234";
+  // Use order number from order data; fallback if not available
+  const getConfirmationNumber = () => {
+    // Prefer the existing order number if present
+    const num = orderData?.orderNumber;
+    if (num && String(num).trim().length > 0) return String(num);
+
+    // Generate EC-YYYYMMDD-<RANDOM>
+    const d = orderData?.orderDate ? new Date(orderData.orderDate) : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const random = Array.from(crypto?.getRandomValues ? crypto.getRandomValues(new Uint8Array(6)) : new Array(6).fill(0).map(() => Math.floor(Math.random()*256)))
+      .map((n) => (n % 36))
+      .map((v) => v.toString(36))
+      .join('')
+      .toUpperCase();
+    return `EC-${yyyy}${mm}${dd}-${random}`;
+  };
 
   // Get order data
   useEffect(() => {
@@ -124,7 +140,7 @@ function Confirmation() {
           letterSpacing: '2px',
           fontFamily: 'monospace'
         }}>
-          {CONFIRMATION_NUMBER}
+          {getConfirmationNumber()}
         </div>
         <p style={{ 
           fontSize: '14px',

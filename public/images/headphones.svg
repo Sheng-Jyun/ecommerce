@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180">
+  <rect width="240" height="180" fill="#f8f9fa"/>
+  <circle cx="80" cy="90" r="30" fill="#6c757d"/>
+  <circle cx="160" cy="90" r="30" fill="#6c757d"/>
+  <rect x="80" y="60" width="80" height="20" fill="#495057"/>
+  <text x="120" y="160" font-size="18" text-anchor="middle" fill="#343a40" font-family="Arial, sans-serif">Headphones</text>
+</svg>

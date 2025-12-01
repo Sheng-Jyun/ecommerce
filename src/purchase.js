@@ -8,6 +8,23 @@ function Purchase() {
   const BASE =
     "https://ybfzpctey6.execute-api.us-east-2.amazonaws.com/dev/inventory-management";
 
+  // Optional: map known products to static images (public folder or external URLs)
+  // Example usage: place files in `public/images/` and reference with `/images/filename.png`
+  const IMAGE_MAP = {
+    // By ID
+    // "1001": "/images/laptop.svg",
+    // "1002": "/images/headphones.svg",
+    "SKU-100": "/images/SKU-100.jpg",
+    "SKU-200": "/images/SKU-200.jpg",
+    "SKU-300": "/images/SKU-300.jpg",
+    "SKU-400": "/images/SKU-400.jpg",
+    "SKU-500": "/images/SKU-500.jpg",
+    // By name (case-insensitive match in resolver)
+    "laptop": "/images/laptop.svg",
+    "headphones": "/images/headphones.svg",
+
+  };
+
   const [items, setItems] = useState([]);   // [{id, name, price, qty}]
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -143,6 +160,25 @@ function Purchase() {
     });
   };
 
+  // Resolve an image URL for a given item; fall back to a placeholder
+  const getItemImageUrl = (item) => {
+    // Prefer backend-provided fields
+    const candidate = item.imageUrl || item.image || item.img || null;
+    if (candidate && typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate;
+    }
+
+    // Try local/static mappings by id or name
+    const idKey = IMAGE_MAP[String(item.id)];
+    if (idKey) return idKey;
+    const nameKey = IMAGE_MAP[String(item.name || "").toLowerCase()];
+    if (nameKey) return nameKey;
+
+    // Fallback placeholder
+    const label = encodeURIComponent(String(item.name || "Item"));
+    return `https://via.placeholder.com/120x90.png?text=${label}`;
+  };
+
   if (loading) {
     return (
       <div style={{ padding: 20, maxWidth: 800, margin: "0 auto" }}>
@@ -172,6 +208,7 @@ function Purchase() {
             const itemId = String(item.id);
             const inStock = Number(item.qty || 0);
             const selected = Number(cart[itemId] || 0);
+            const imgUrl = getItemImageUrl(item);
 
             return (
               <div
@@ -181,15 +218,31 @@ function Purchase() {
                   padding: "20px",
                   marginBottom: "15px",
                   borderRadius: "8px",
-                  display: "flex",
-                  justifyContent: "space-between",
+                  display: "grid",
+                  gridTemplateColumns: "130px 1fr auto",
                   alignItems: "center",
+                  gap: "16px",
                   boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                   transition: "border-color 0.2s ease",
                   opacity: inStock > 0 ? 1 : 0.6,
                 }}
               >
-                <div>
+                <div style={{ width: "130px", height: "100px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <img
+                    src={imgUrl}
+                    alt={`${item.name} product image`}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "cover",
+                      borderRadius: "6px",
+                      border: "1px solid #dee2e6",
+                      backgroundColor: "#f8f9fa",
+                    }}
+                    loading="lazy"
+                  />
+                </div>
+                <div style={{ minWidth: 0 }}>
                   <h3 style={{ margin: "0 0 5px 0" }}>
                     {item.name}{" "}
                     <small style={{ color: "#6c757d" }}>(ID: {item.id})</small>
@@ -212,7 +265,6 @@ function Purchase() {
                     </span>
                   </p>
                 </div>
-
                 <div
                   style={{
                     display: "flex",
@@ -298,6 +350,43 @@ function Purchase() {
             >
               <span>Total:</span>
               <span>${calculateTotal().toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const cartData = Object.entries(cart)
+                    .map(([itemId, quantity]) => {
+                      const item = items.find((x) => String(x.id) === String(itemId));
+                      return item ? { id: item.id, name: item.name, price: item.price, category: item.category, quantity } : null;
+                    })
+                    .filter(Boolean);
+                  const total = calculateTotal();
+                  localStorage.setItem('shoppingCart', JSON.stringify(cartData));
+                  localStorage.setItem('totalAmount', String(total));
+                }}
+                style={{
+                  backgroundColor: '#6c757d', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 14px', cursor: 'pointer'
+                }}
+              >Save Cart</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cartData = Object.entries(cart)
+                    .map(([itemId, quantity]) => {
+                      const item = items.find((x) => String(x.id) === String(itemId));
+                      return item ? { id: item.id, name: item.name, price: item.price, category: item.category, quantity } : null;
+                    })
+                    .filter(Boolean);
+                  const total = calculateTotal();
+                  localStorage.setItem('shoppingCart', JSON.stringify(cartData));
+                  localStorage.setItem('totalAmount', String(total));
+                  navigate('/cart');
+                }}
+                style={{
+                  backgroundColor: '#17a2b8', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 14px', cursor: 'pointer'
+                }}
+              >Go to Cart</button>
             </div>
           </div>
         )}

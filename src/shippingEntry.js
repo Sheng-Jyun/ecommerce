@@ -27,9 +27,9 @@ function ShippingEntry() {
     zip: ''
   });
 
-  // Ohio cities list
-  const ohioCities = [
-    'Columbus', 'Cleveland', 'Cincinnati', 'Toledo', 'Akron', 'Dayton', 'Mansfield', 'Dublin'
+  // US states list
+  const usStates = [
+    'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','District of Columbia','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'
   ];
 
   // Load data
@@ -82,10 +82,13 @@ function ShippingEntry() {
       ].filter(Boolean).join(', ')
     };
 
+    // Amount to charge (use totalAmount from previous steps)
+    const amount = Number(totalAmount) || cartData.reduce((sum, x) => sum + Number(x.price) * Number(x.quantity || x.qty || 0), 0);
+
     const res = await fetch(`${BASE}/order-processing/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: itemsPayload, payment, shipping })
+      body: JSON.stringify({ items: itemsPayload, payment, shipping, amount })
     });
 
     let data = {};
@@ -287,7 +290,9 @@ function ShippingEntry() {
                 }}
               >
                 <option value="">Select State</option>
-                <option value="Ohio">Ohio</option>
+                {usStates.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
 
@@ -295,10 +300,12 @@ function ShippingEntry() {
               <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
                 City *
               </label>
-              <select
+              <input
+                type="text"
                 name="city"
                 value={shippingForm.city}
                 onChange={handleInputChange}
+                placeholder="Enter city"
                 required
                 style={{
                   width: '100%',
@@ -307,12 +314,7 @@ function ShippingEntry() {
                   borderRadius: '4px',
                   fontSize: '16px'
                 }}
-              >
-                <option value="">Select City</option>
-                {ohioCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
+              />
             </div>
           </div>
 

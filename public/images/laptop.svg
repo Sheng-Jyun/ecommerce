@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180">
+  <rect width="240" height="180" fill="#f8f9fa"/>
+  <rect x="40" y="30" width="160" height="90" rx="6" fill="#ced4da"/>
+  <rect x="20" y="130" width="200" height="20" rx="4" fill="#adb5bd"/>
+  <text x="120" y="80" font-size="20" text-anchor="middle" fill="#343a40" font-family="Arial, sans-serif">Laptop</text>
+</svg>
