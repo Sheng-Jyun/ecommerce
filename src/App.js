@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import './App.css';
-import Purchase from './purchase';
+// import Purchase from './purchase';
 import PaymentEntry from './paymentEntry';
 import ShippingEntry from './shippingEntry';
 import ViewOrder from './viewOrder';
@@ -8,6 +8,8 @@ import Confirmation from './Confirmation';
 import About from './About';
 import Cart from './Cart';
 import ChatBot from './ChatBot';
+import Templates from './Templates';
+import CategoryTemplates from './CategoryTemplates';
 import React, { useState } from 'react';
 
 function TopNavBar() {
@@ -16,27 +18,29 @@ function TopNavBar() {
   return (
     <nav className="top-nav">
       <div className="top-nav__brand">
-        <Link to="/purchase" className="top-nav__logo">Ecommerce Demo</Link>
+        <Link to="/templates" className="top-nav__logo">JRJ Web re-inventer</Link>
       </div>
       <ul className="top-nav__links">
         <li>
           <Link to="/about" className={isActive('/about') ? 'active' : ''}>About</Link>
         </li>
         <li>
-          <Link to="/purchase" className={isActive('/purchase') ? 'active' : ''}>Products</Link>
+          <Link to="/templates" className={isActive('/templates') ? 'active' : ''}>Templates</Link>
         </li>
-        <li>
+        {/* Products link removed: selling templates only */}
+        {/*<li>
           <Link to="/purchase/paymentEntry" className={isActive('/purchase/paymentEntry') ? 'active' : ''}>Payment</Link>
-        </li>
-        <li>
-          <Link to="/purchase/shippingEntry" className={isActive('/purchase/shippingEntry') ? 'active' : ''}>Shipping</Link>
-        </li>
-        <li>
-          <Link to="/cart" className={isActive('/cart') ? 'active' : ''}>Cart</Link>
         </li>
         <li>
           <Link to="/confirmation" className={isActive('/confirmation') ? 'active' : ''}>Confirmation</Link>
         </li>
+        <li>
+          <Link to="/purchase/shippingEntry" className={isActive('/purchase/shippingEntry') ? 'active' : ''}>Shipping</Link>
+        </li>*/}
+        <li>
+          <Link to="/cart" className={isActive('/cart') ? 'active' : ''}>Cart</Link>
+        </li>
+        
         <li>
           <Link to="/chat" className={isActive('/chat') ? 'active' : ''}>ChatBot</Link>
         </li>
@@ -53,14 +57,16 @@ function App() {
         <TopNavBar />
         <Routes>
           <Route path="/about" element={<About />} />
-          <Route path='/purchase' element={<Purchase/>} />
-          <Route path="/" element={<Navigate replace to="/purchase" />} />
+          {/* Products route removed; redirect root to templates */}
+          <Route path="/" element={<Navigate replace to="/templates" />} />
+          <Route path='/purchase/viewOrder' element={<ViewOrder/>} />
           <Route path='/purchase/paymentEntry' element={<PaymentEntry/>} />
           <Route path='/purchase/shippingEntry' element={<ShippingEntry/>} />
-          <Route path='/purchase/viewOrder' element={<ViewOrder/>} />
           <Route path="/confirmation" element={<Confirmation />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/chat" element={<ChatBot />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/templates/:category" element={<CategoryTemplates />} />
         </Routes>
 
         {/* Floating Chat widget trigger */}

@@ -1,92 +1,46 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function ChatBot() {
   const navigate = useNavigate();
 
-  const INVENTORY_BASE =
-    "https://ybfzpctey6.execute-api.us-east-2.amazonaws.com/dev/inventory-management";
   const CHAT_BASE =
     "https://ybfzpctey6.execute-api.us-east-2.amazonaws.com/dev/chatbot";
 
-  const [items, setItems] = useState([]);
-  const [loadingInventory, setLoadingInventory] = useState(true);
-  const [inventoryError, setInventoryError] = useState(null);
+  // Local templates catalog for recommendations (for UI only)
+  const templateCatalog = [
+    { id: "tmpl-fashion-hero", name: "Clothing Store — Modern Apparel", price: 299, category: "clothing-store" },
+    { id: "tmpl-electronics-tech", name: "Electronics Store — Tech Hub", price: 349, category: "electronics-store" },
+    { id: "tmpl-blog-clean", name: "Personal Blog — Clean Blog", price: 199, category: "personal-blog" },
+    { id: "tmpl-gov-portal", name: "Government Site — City Services", price: 499, category: "government-site" },
+    { id: "tmpl-food-restaurant", name: "Food & Groceries — Restaurant Classic", price: 279, category: "food-store" },
+    { id: "tmpl-furn-showroom", name: "Furniture Store — Showroom Catalog", price: 329, category: "furniture-store" },
+  ];
 
   const [messages, setMessages] = useState([
     {
       role: "bot",
       text:
-        "Hi! Ask me about this season’s styles or how to match outfits. I’ll recommend products.",
+        "Hi! I help you pick website templates. Just tell me something like 'restaurant website', 'electronics shop', 'personal blog', 'government portal', or 'furniture store', and I’ll recommend 3–5 templates for you.",
     },
   ]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState(null);
 
-  // ====== 抓 inventory ======
-  useEffect(() => {
-    async function fetchInventory() {
-      try {
-        const res = await fetch(`${INVENTORY_BASE}/inventory`);
-        const text = await res.text();
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          setInventoryError("Failed to load inventory");
-          setLoadingInventory(false);
-          return;
-        }
-        let itemsPayload = Array.isArray(data.items) ? data.items : undefined;
-        if (!itemsPayload && data.body) {
-          try {
-            const inner =
-              typeof data.body === "string"
-                ? JSON.parse(data.body)
-                : data.body;
-            if (Array.isArray(inner.items)) itemsPayload = inner.items;
-          } catch {}
-        }
-        if (!itemsPayload) {
-          setInventoryError("Failed to load inventory");
-        } else {
-          const normalized = itemsPayload.map((it) => ({
-            ...it,
-            qty: it.qty ?? it.availableQty ?? 0,
-            name: String(it.name || ""),
-            category: it.category,
-            price: Number(it.price || 0),
-          }));
-          setItems(normalized);
-        }
-      } catch (e) {
-        console.error(e);
-        setInventoryError("Failed to load inventory");
-      } finally {
-        setLoadingInventory(false);
-      }
-    }
-    fetchInventory();
-  }, []);
-
   const index = useMemo(() => {
-    return items.map((it) => ({
+    return templateCatalog.map((it) => ({
       ...it,
       tokens: `${(it.name || "").toLowerCase()} ${(it.category || "").toLowerCase()}`,
     }));
-  }, [items]);
+  }, [templateCatalog]);
 
-  // ====== 呼叫後端 /chatbot (OpenAI) ======
-  // ====== 呼叫後端 /chatbot (OpenAI) ======
   async function callChatAPI(newMessages) {
-    // 轉成 OpenAI 格式：user / assistant
     const payloadMessages = newMessages.map((m) => ({
       role: m.role === "bot" ? "assistant" : "user",
       content: m.text,
     }));
 
-    // ⬅️ 先建好 payloadMessages，再印出來
     console.log(
       "SENDING TO LAMBDA:",
       JSON.stringify({ messages: payloadMessages }, null, 2)
@@ -110,20 +64,13 @@ function ChatBot() {
         data = JSON.parse(raw);
       } catch (err) {
         console.error("Failed to parse outer JSON:", err);
-        // 後端如果回的不是 JSON，就直接把 raw 顯示出來
         return raw || "Sorry, I could not respond just now.";
       }
 
-      // data 可能是：
-      // { statusCode: 200, headers: {...}, body: "{\"reply\":\"...\"}" }
-      // 或未來改成 { reply: "..." }
-
-      // 情況 1：直接有 reply
       if (data.reply) {
         return data.reply;
       }
 
-      // 情況 2：reply 包在 body 裡
       if (data.body) {
         try {
           const inner =
@@ -138,7 +85,6 @@ function ChatBot() {
         }
       }
 
-      // 其他 fallback
       return "Sorry, I got no reply.";
     } catch (err) {
       console.error("callChatAPI error:", err);
@@ -146,20 +92,17 @@ function ChatBot() {
     }
   }
 
-
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(textOverride) {
+    const text = (textOverride ?? input).trim();
     if (!text || chatLoading) return;
 
     setChatError(null);
 
-    // 1. 先把 user 訊息加進 state
     const newUserMessage = { role: "user", text };
     const newMessages = [...messages, newUserMessage];
     setMessages(newMessages);
     setInput("");
 
-    // 2. 呼叫後端（這版 callChatAPI 不會 throw，只會回字串）
     setChatLoading(true);
     const reply = await callChatAPI(newMessages);
     const botMessage = { role: "bot", text: reply };
@@ -196,24 +139,41 @@ function ChatBot() {
     ]);
   }
 
-  // ====== Render ======
-
-  if (loadingInventory) {
-    return <div style={{ padding: 20 }}>Loading inventory & ChatBot...</div>;
-  }
-  if (inventoryError) {
-    return (
-      <div style={{ padding: 20, color: "crimson" }}>{inventoryError}</div>
-    );
-  }
+  const quickExamples = [
+    "Restaurant website for Chinese food",
+    "Electronics shop with product grid",
+    "Clean personal blog layout",
+    "Accessible government portal",
+    "Furniture showroom website",
+  ];
 
   return (
     <div style={{ padding: "20px", maxWidth: "900px", margin: "0 auto" }}>
-      <h1>Shopping Assistant</h1>
+      <h1>Template Assistant</h1>
       <p style={{ color: "#495057" }}>
-        Ask about seasonal styles or your outfit ideas, and I’ll recommend
-        items. Try: “summer t-shirt”, “warm jacket”, “formal shirt”.
+        Describe the website you want, and I’ll recommend templates. Try things like:
+        “restaurant website”, “electronics store”, “clean personal blog”, or “government portal”.
       </p>
+
+      {/* Quick example buttons */}
+      <div style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {quickExamples.map((q) => (
+          <button
+            key={q}
+            onClick={() => handleSend(q)}
+            style={{
+              border: "1px solid #ced4da",
+              borderRadius: 999,
+              padding: "6px 12px",
+              background: "#f8f9fa",
+              cursor: "pointer",
+              fontSize: 13,
+            }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
 
       <div
         style={{
@@ -252,7 +212,7 @@ function ChatBot() {
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSend();
           }}
-          placeholder="Type your question..."
+          placeholder="Type something like 'restaurant website' or 'clean blog'..."
           style={{
             flex: 1,
             padding: 10,
@@ -261,7 +221,7 @@ function ChatBot() {
           }}
         />
         <button
-          onClick={handleSend}
+          onClick={() => handleSend()}
           style={{
             backgroundColor: "#0d6efd",
             color: "#fff",
@@ -289,9 +249,9 @@ function ChatBot() {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <h3>Popular Picks</h3>
+        <h3>Popular Templates</h3>
         <div style={{ display: "grid", gap: 12 }}>
-          {index.slice(0, 5).map((item) => (
+          {index.slice(0, 6).map((item) => (
             <div
               key={item.id}
               style={{
@@ -305,17 +265,11 @@ function ChatBot() {
             >
               <div>
                 <strong>{item.name}</strong>
-                {item.category && (
-                  <div style={{ color: "#6c757d" }}>
-                    Category: {item.category}
-                  </div>
-                )}
                 <div style={{ color: "#495057" }}>
-                  $ {item.price.toLocaleString()} •{" "}
-                  {Number(item.qty || 0)} in stock
+                  $ {item.price.toLocaleString()} • Category: {item.category}
                 </div>
               </div>
-              <div>
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={() => addToCart(item)}
                   style={{
@@ -328,6 +282,19 @@ function ChatBot() {
                   }}
                 >
                   Add to Cart
+                </button>
+                <button
+                  onClick={() => navigate(`/templates/${item.category}`)}
+                  style={{
+                    backgroundColor: "#6f42c1",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  View Category
                 </button>
               </div>
             </div>

@@ -34,18 +34,18 @@ function ShippingEntry() {
 
   // Load data
   useEffect(() => {
-    const savedCart = localStorage.getItem('shoppingCart');
-    const savedTotal = localStorage.getItem('totalAmount');
-    const savedPayment = localStorage.getItem('paymentInfo');
+    // Clear previous shipping record on open
+    localStorage.removeItem('shippingInfo');
 
-    if (savedCart) setCartData(JSON.parse(savedCart));
-    if (savedTotal) setTotalAmount(parseInt(savedTotal));
-    if (savedPayment) setPaymentInfo(JSON.parse(savedPayment));
-
+    // Do NOT load cart from localStorage; rely on navigation state
     if (location.state) {
       if (location.state.cart) setCartData(location.state.cart);
       if (location.state.total) setTotalAmount(location.state.total);
       if (location.state.payment) setPaymentInfo(location.state.payment);
+    } else {
+      // Fallback: start with empty cart/total if no state provided
+      setCartData([]);
+      setTotalAmount(0);
     }
   }, [location]);
 

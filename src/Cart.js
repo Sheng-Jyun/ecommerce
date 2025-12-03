@@ -1,23 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 function Cart() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartData, setCartData] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [savedOrders, setSavedOrders] = useState([]); // list of previously saved orders
 
   useEffect(() => {
-    const savedCart = localStorage.getItem('shoppingCart');
-    const savedTotal = localStorage.getItem('totalAmount');
-    if (savedCart) setCartData(JSON.parse(savedCart));
-    if (savedTotal) setTotalAmount(Number(savedTotal));
-
-    const orders = localStorage.getItem('savedOrders');
-    if (orders) {
-      try {
-        setSavedOrders(JSON.parse(orders));
-      } catch {}
+    // Prefer navigation state when coming from add-to-cart
+    if (location.state && Array.isArray(location.state.cart)) {
+      const incoming = location.state.cart;
+      const incomingTotal = incoming.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity || 1), 0);
+      setCartData(incoming);
+      setTotalAmount(incomingTotal);
+      localStorage.setItem('shoppingCart', JSON.stringify(incoming));
+      localStorage.setItem('totalAmount', String(incomingTotal));
+    } else {
+      // Otherwise load from localStorage; if empty, show empty cart
+      const savedCart = localStorage.getItem('shoppingCart');
+      const savedTotal = localStorage.getItem('totalAmount');
+      if (savedCart) setCartData(JSON.parse(savedCart));
+      if (savedTotal) setTotalAmount(Number(savedTotal));
     }
   }, []);
 
@@ -64,7 +69,7 @@ function Cart() {
     <div style={{ padding: '20px', maxWidth: '900px', margin: '0 auto' }}>
       <h1>Your Cart</h1>
       {cartData.length === 0 ? (
-        <p style={{ color: '#495057' }}>Cart is empty. Go to Products to add items.</p>
+        <p style={{ color: '#495057' }}>Cart is empty. Go to Templates to add items.</p>
       ) : (
         <div style={{
           border: '1px solid #dee2e6',
@@ -117,9 +122,9 @@ function Cart() {
         <button onClick={() => navigate('/purchase')} style={{
           backgroundColor: '#6c757d', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', cursor: 'pointer'
         }}>Back to Products</button>
-        <button onClick={saveCurrentAsOrder} style={{
+        {/*<button onClick={saveCurrentAsOrder} style={{
           backgroundColor: '#0d6efd', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', cursor: 'pointer'
-        }}>Save as Order</button>
+        }}>Save as Order</button>*/}
         <button onClick={handleGoToPayment} style={{
           backgroundColor: '#28a745', color: '#fff', border: 'none', borderRadius: '6px', padding: '10px 18px', cursor: 'pointer'
         }}>Go to Payment</button>
@@ -173,6 +178,9 @@ function Cart() {
                 </div>
               </div>
             ))}
+            <button onClick={() => { localStorage.removeItem('savedOrders'); setSavedOrders([]); }} style={{
+              backgroundColor: '#dc3545', color: '#fff', border: 'none', borderRadius: '6px', padding: '8px 12px', cursor: 'pointer'
+            }}>Clear All Saved Orders</button>
           </div>
         )}
       </div>
